@@ -176,6 +176,8 @@ export async function createReservation(input: {
   quantity: number;
 }): Promise<ReservationSummary> {
   const reservation = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Raise per-transaction statement timeout to avoid short interactive timeouts
+    await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 20000');
     const lockedStocks = (await tx.$queryRawUnsafe(
       'SELECT "id", "productId", "warehouseId", "totalUnits", "reserved" FROM "Stock" WHERE "productId" = $1 AND "warehouseId" = $2 FOR UPDATE',
       input.productId,
@@ -224,6 +226,8 @@ export async function createReservation(input: {
 
 export async function confirmReservation(id: string): Promise<ReservationSummary> {
   const reservation = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Increase timeout in case of transient DB latency
+    await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 20000');
     const rows = (await tx.$queryRawUnsafe(
       'SELECT "id", "productId", "warehouseId", "quantity", "status", "expiresAt", "createdAt", "updatedAt", "confirmedAt", "releasedAt" FROM "Reservation" WHERE "id" = $1 FOR UPDATE',
       id,
@@ -279,6 +283,8 @@ export async function confirmReservation(id: string): Promise<ReservationSummary
 
 export async function releaseReservation(id: string): Promise<ReservationSummary> {
   const reservation = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Increase timeout for confirmation operations
+    await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 20000');
     const rows = (await tx.$queryRawUnsafe(
       'SELECT "id", "productId", "warehouseId", "quantity", "status", "expiresAt", "createdAt", "updatedAt", "confirmedAt", "releasedAt" FROM "Reservation" WHERE "id" = $1 FOR UPDATE',
       id,
@@ -321,6 +327,8 @@ export async function cleanupExpiredReservations() {
   const now = new Date();
 
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Increase timeout for cleanup operations
+    await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 20000');
     const expiredReservations = (await tx.reservation.findMany({
       where: {
         status: "PENDING",
