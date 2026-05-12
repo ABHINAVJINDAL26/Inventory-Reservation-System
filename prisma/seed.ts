@@ -43,14 +43,14 @@ async function main() {
       {
         name: "Webcam HD",
         description: "1080p webcam with low-light correction.",
-        imageUrl: "https://images.unsplash.com/photo-1516321318423-f06f70d504f0?auto=format&fit=crop&w=1200&q=80",
+        imageUrl: "https://images.pexels.com/photos/3394650/pexels-photo-3394650.jpeg?auto=compress&cs=tinysrgb&w=600",
         price: 3799,
         sku: "WC-004",
       },
       {
         name: "Laptop Stand",
         description: "Aluminium stand with ergonomic height adjustment.",
-        imageUrl: "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=1200&q=80",
+        imageUrl: "https://images.pexels.com/photos/7974/pexels-photo.jpg?auto=compress&cs=tinysrgb&w=600",
         price: 899,
         sku: "LS-005",
       },

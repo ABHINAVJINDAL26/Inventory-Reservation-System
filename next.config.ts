@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     root: process.cwd(),
   },
   images: {
-    domains: ["images.unsplash.com"],
+    domains: ["images.unsplash.com", "images.pexels.com"],
   },
 };
 
