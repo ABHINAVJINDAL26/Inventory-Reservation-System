@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/format";
 function reserveDefaultProduct(product: ProductSummary) {
   const firstAvailable = product.stocks.find((stock) => stock.available > 0);
   return {
-    warehouseId: firstAvailable?.warehouseId ?? product.stocks[0]?.warehouseId ?? "",
+    warehouseId: firstAvailable?.warehouseId ?? "",
     quantity: 1,
   };
 }
@@ -23,6 +23,8 @@ export function CatalogView({ products, warehouses }: CatalogPayload) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const hasProducts = useMemo(() => products.length > 0, [products.length]);
+  const selectedWarehouseStock = selectedProduct?.stocks.find((stock) => stock.warehouseId === warehouseId) ?? null;
+  const selectedWarehouseAvailable = selectedWarehouseStock?.available ?? 0;
 
   function openReservation(product: ProductSummary) {
     const defaults = reserveDefaultProduct(product);
@@ -35,6 +37,12 @@ export function CatalogView({ products, warehouses }: CatalogPayload) {
 
   async function submitReservation() {
     if (!selectedProduct || !warehouseId) {
+      setError("Please select a warehouse before reserving.");
+      return;
+    }
+
+    if (selectedWarehouseAvailable <= 0) {
+      setError("Selected warehouse is out of stock. Pick another warehouse.");
       return;
     }
 
@@ -122,12 +130,13 @@ export function CatalogView({ products, warehouses }: CatalogPayload) {
 
               return (
                 <article key={product.id} className="overflow-hidden rounded-xl sm:rounded-2xl md:rounded-[1.75rem] border border-white/10 bg-white/5 shadow-xl shadow-slate-950/30 backdrop-blur-xl flex flex-col">
-                  <div className="aspect-[16/10] bg-slate-900/60 w-full">
+                  <div className="relative h-48 w-full overflow-hidden bg-slate-900/80 sm:h-52">
                     {product.imageUrl ? (
                       <Image src={product.imageUrl} alt={product.name} width={1200} height={750} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full items-center justify-center text-xs sm:text-sm text-slate-500">No image</div>
                     )}
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-slate-900/10" />
                   </div>
 
                   <div className="space-y-3 sm:space-y-4 p-3 sm:p-5 flex-1 flex flex-col">
@@ -151,8 +160,15 @@ export function CatalogView({ products, warehouses }: CatalogPayload) {
                             <p className="text-xs text-slate-400">{stock.warehouseLocation}</p>
                           </div>
                           <div className="flex items-center justify-between sm:justify-end">
-                            <span className={`rounded-full border px-2 sm:px-3 py-1 text-xs font-semibold ${stock.available > 0 ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-rose-400/30 bg-rose-400/10 text-rose-200"}`}>
-                              {stock.available} {stock.available === 1 ? "unit" : "units"}
+                            <span
+                              className={`rounded-full border px-2 sm:px-3 py-1 text-xs font-semibold ${stock.available === 0
+                                ? "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                                : stock.available === 1
+                                  ? "border-amber-400/40 bg-amber-400/15 text-amber-100"
+                                  : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                                }`}
+                            >
+                              {stock.available === 0 ? "Out of stock" : `${stock.available} ${stock.available === 1 ? "unit" : "units"}`}
                             </span>
                           </div>
                         </div>
@@ -200,9 +216,10 @@ export function CatalogView({ products, warehouses }: CatalogPayload) {
                   onChange={(event) => setWarehouseId(event.target.value)}
                   className="w-full rounded-lg sm:rounded-2xl border border-white/10 bg-slate-900 px-3 sm:px-4 py-2 sm:py-3 text-slate-50 outline-none ring-0 transition focus:border-indigo-400 text-xs sm:text-sm"
                 >
+                  <option value="">Select a warehouse</option>
                   {selectedProduct.stocks.map((stock) => (
                     <option key={stock.warehouseId} value={stock.warehouseId} disabled={stock.available === 0}>
-                      {stock.warehouseName} - {stock.available} available
+                      {stock.warehouseName} - {stock.available === 0 ? "Out of stock" : `${stock.available} available`}
                     </option>
                   ))}
                 </select>
@@ -213,19 +230,25 @@ export function CatalogView({ products, warehouses }: CatalogPayload) {
                 <input
                   type="number"
                   min={1}
-                  max={Math.max(selectedProduct.stocks.find((stock) => stock.warehouseId === warehouseId)?.available ?? 1, 1)}
+                  max={Math.max(selectedWarehouseAvailable, 1)}
                   value={quantity}
                   onChange={(event) => setQuantity(Number.parseInt(event.target.value, 10) || 1)}
                   className="w-full rounded-lg sm:rounded-2xl border border-white/10 bg-slate-900 px-3 sm:px-4 py-2 sm:py-3 text-slate-50 outline-none ring-0 transition focus:border-indigo-400 text-xs sm:text-sm"
                 />
               </label>
 
+              {warehouseId && selectedWarehouseAvailable <= 0 ? (
+                <div className="rounded-lg sm:rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-rose-100">
+                  This warehouse is out of stock. Select a different warehouse to continue.
+                </div>
+              ) : null}
+
               {error ? <div className="rounded-lg sm:rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-rose-100">{error}</div> : null}
 
               <button
                 type="button"
                 onClick={() => void submitReservation()}
-                disabled={isSubmitting || !warehouseId}
+                disabled={isSubmitting || !warehouseId || selectedWarehouseAvailable <= 0}
                 className="w-full rounded-lg sm:rounded-2xl bg-emerald-500 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 min-h-10"
               >
                 {isSubmitting ? "Reserving..." : "Confirm reservation"}
