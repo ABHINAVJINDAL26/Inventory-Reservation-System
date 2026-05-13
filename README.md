@@ -6,9 +6,9 @@ Live demo: https://inventory-reservation-system-slk4.vercel.app/
 
 ## Overview
 
-This project handles stock reservations while a customer is checking out. The flow is simple: create a temporary hold, confirm it after payment succeeds, and release it if payment fails or the hold expires.
+This project handles stock reservations while a customer is checking out. It creates a temporary hold, confirms it after payment succeeds, and releases it if payment fails or the hold expires.
 
-The main goal is to avoid overselling when multiple users are checking out at the same time and to keep stock availability accurate across warehouses.
+The app is meant to prevent overselling and keep stock availability accurate across warehouses.
 
 ## What the app does
 
@@ -112,9 +112,9 @@ Relationship summary:
 
 ## Concurrency and Expiry
 
-The reservation write path uses a transaction with row locking (`SELECT FOR UPDATE`) so stock cannot be double-booked. This is the safest part of the system and the main reason the app stays correct under concurrent checkout traffic.
+The reservation write path uses a transaction with row locking (`SELECT FOR UPDATE`) so stock cannot be double-booked under concurrent checkout traffic.
 
-Expiry is handled by a scheduled cleanup job. On Vercel Hobby, the project uses a daily Vercel cron schedule, and a GitHub Actions workflow is included for more frequent cleanup scheduling.
+Expiry is handled by a scheduled cleanup job. On Vercel Hobby, the project uses a daily Vercel cron schedule, and GitHub Actions is included for more frequent cleanup runs.
 
 ## Frontend Pages
 
@@ -251,5 +251,5 @@ The test coverage checks:
 ## Notes
 
 - `.env`, `.env.local`, `node_modules`, and `.next` are ignored and not part of the repository.
-- The repo is kept lean and readable, with the main logic in the API and inventory layer.
+- The main logic lives in the API and inventory layer.
 - For faster cleanup runs on Vercel, use GitHub Actions or move to a plan with more cron support.
