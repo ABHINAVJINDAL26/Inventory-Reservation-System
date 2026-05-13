@@ -94,7 +94,7 @@ async function main() {
   });
 
   const stockMatrix = [
-    [18, 9, 24],
+    [1, 9, 24],
     [14, 8, 20],
     [32, 12, 16],
     [11, 7, 13],
