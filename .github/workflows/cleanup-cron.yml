@@ -1,0 +1,28 @@
+name: Cleanup Cron
+
+on:
+  schedule:
+    # GitHub Actions minimum granularity is 5 minutes; run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  call-cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cleanup endpoint
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing secrets: set CRON_URL and CRON_SECRET in repository Secrets"
+            exit 1
+          fi
+          echo "Calling cleanup endpoint: $CRON_URL/api/cron/cleanup?secret=***"
+          status=$(curl -s -o /dev/null -w "%{http_code}" "$CRON_URL/api/cron/cleanup?secret=$CRON_SECRET")
+          echo "HTTP status: $status"
+          if [ "$status" -ge 400 ]; then
+            echo "Cleanup call failed with status $status"
+            exit 1
+          fi
