@@ -32,3 +32,7 @@ jobs:
       - name: Run tests
         working-directory: allo-inventory
         run: npm test
+
+      - name: Run build
+        working-directory: allo-inventory
+        run: npm run build
