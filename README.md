@@ -251,5 +251,5 @@ The test coverage checks:
 ## Notes
 
 - `.env`, `.env.local`, `node_modules`, and `.next` are ignored and not part of the repository.
-- The repo is meant to stay lean and readable, with the important logic in the API and inventory layer.
-- If you need a faster cleanup cadence on Vercel, use GitHub Actions or upgrade to a plan with more cron support.
+- The repo is kept lean and readable, with the main logic in the API and inventory layer.
+- For faster cleanup runs on Vercel, use GitHub Actions or move to a plan with more cron support.
