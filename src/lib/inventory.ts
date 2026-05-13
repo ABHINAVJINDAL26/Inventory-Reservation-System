@@ -301,19 +301,7 @@ export async function releaseReservation(id: string): Promise<ReservationSummary
     }
 
     if (lockedReservation.status === "RELEASED") {
-      const existing = await tx.reservation.findUnique({
-        where: { id },
-        include: {
-          product: true,
-          warehouse: true,
-        },
-      });
-
-      if (!existing) {
-        throw notFound("Reservation not found.");
-      }
-
-      return existing;
+      throw conflict("Reservation has already been released.");
     }
 
     const releasedReservation = await releaseReservationRow(tx, lockedReservation);

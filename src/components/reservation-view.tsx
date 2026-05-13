@@ -46,13 +46,28 @@ export function ReservationView({ initialReservation }: { initialReservation: Re
         headers: {
           "Content-Type": "application/json",
           ...(label === "confirm" ? { "Idempotency-Key": crypto.randomUUID() } : {}),
+          ...(label === "release" ? { "Idempotency-Key": crypto.randomUUID() } : {}),
         },
       });
 
       const payload = (await response.json()) as Partial<ReservationSummary> & { error?: string };
 
       if (!response.ok) {
-        setMessage(payload.error ?? "Unable to update reservation.");
+        let errorMessage = payload.error ?? "Unable to update reservation.";
+        
+        if (response.status === 410) {
+          errorMessage = "Reservation expired. Please start a new reservation.";
+        } else if (response.status === 409) {
+          errorMessage = label === "confirm"
+            ? "Reservation already confirmed or released. Cannot confirm again."
+            : "Reservation already released. Cannot release again.";
+        } else if (response.status === 404) {
+          errorMessage = "Reservation not found.";
+        } else if (response.status === 400) {
+          errorMessage = payload.error ?? "Invalid request. Please check your input.";
+        }
+        
+        setMessage(errorMessage);
         return;
       }
 
