@@ -1,4 +1,40 @@
+import fs from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+
+function loadEnvFile(filePath: string) {
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const fileContents = fs.readFileSync(filePath, "utf8");
+
+  for (const line of fileContents.split(/\r?\n/)) {
+    const trimmedLine = line.trim();
+
+    if (!trimmedLine || trimmedLine.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = trimmedLine.indexOf("=");
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = trimmedLine.slice(0, separatorIndex).trim();
+    const rawValue = trimmedLine.slice(separatorIndex + 1).trim();
+    const value = rawValue.startsWith('"') && rawValue.endsWith('"')
+      ? rawValue.slice(1, -1)
+      : rawValue;
+
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadEnvFile(path.resolve(process.cwd(), ".env.local"));
+loadEnvFile(path.resolve(process.cwd(), ".env"));
 
 const prisma = new PrismaClient();
 
