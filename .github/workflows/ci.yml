@@ -19,20 +19,16 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: allo-inventory/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: allo-inventory
         run: npm ci
 
       - name: Run lint
-        working-directory: allo-inventory
         run: npm run lint
 
       - name: Run tests
-        working-directory: allo-inventory
         run: npm test
 
       - name: Run build
-        working-directory: allo-inventory
         run: npm run build
