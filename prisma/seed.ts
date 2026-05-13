@@ -43,7 +43,7 @@ async function main() {
       {
         name: "Webcam HD",
         description: "1080p webcam with low-light correction.",
-        imageUrl: "https://images.pexels.com/photos/3394650/pexels-photo-3394650.jpeg?auto=compress&cs=tinysrgb&w=600",
+        imageUrl: "/products/webcam-hd.svg",
         price: 3799,
         sku: "WC-004",
       },
