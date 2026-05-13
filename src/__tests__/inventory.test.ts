@@ -1,6 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports, @typescript-eslint/no-unused-vars */
 import { createReservation, confirmReservation, releaseReservation } from '@/lib/inventory';
-
-import type { HttpError } from '@/lib/errors';
 
 // Mock prisma with an in-memory store and serialized transactions to emulate SELECT FOR UPDATE
 jest.mock('@/lib/prisma', () => {
@@ -19,6 +18,21 @@ jest.mock('@/lib/prisma', () => {
     stocks = JSON.parse(JSON.stringify(initialStocks));
     for (const k of Object.keys(reservations)) delete reservations[k];
     reservationCounter = 1;
+  }
+
+  function getStockSnapshot() {
+    return JSON.parse(JSON.stringify(stocks));
+  }
+
+  function getReservationSnapshot(id: string) {
+    const reservation = reservations[id];
+    return reservation ? JSON.parse(JSON.stringify(reservation)) : null;
+  }
+
+  function setReservationExpiresAt(id: string, expiresAt: Date) {
+    if (reservations[id]) {
+      reservations[id].expiresAt = expiresAt;
+    }
   }
 
   resetState();
@@ -129,6 +143,9 @@ jest.mock('@/lib/prisma', () => {
   };
 
   mockPrisma.__reset = resetState;
+  mockPrisma.__getStockSnapshot = getStockSnapshot;
+  mockPrisma.__getReservationSnapshot = getReservationSnapshot;
+  mockPrisma.__setReservationExpiresAt = setReservationExpiresAt;
 
   return { prisma: mockPrisma };
 });
@@ -165,5 +182,47 @@ describe('inventory.createReservation', () => {
 
     // Second reservation should fail with conflict
     await expect(createReservation({ productId: 'prod-1', warehouseId: 'wh-1', quantity: 1 })).rejects.toMatchObject({ status: 409 });
+  });
+
+  test('confirms an active reservation and consumes reserved stock', async () => {
+    const reservation = await createReservation({ productId: 'prod-1', warehouseId: 'wh-1', quantity: 2 });
+    const confirmed = await confirmReservation(reservation.id);
+
+    expect(confirmed.status).toBe('CONFIRMED');
+
+    const { prisma } = require('@/lib/prisma');
+    const stock = prisma.__getStockSnapshot()['prod-1|wh-1'];
+    expect(stock.reserved).toBe(0);
+    expect(stock.totalUnits).toBe(3);
+  });
+
+  test('releases a pending reservation and restores reserved stock', async () => {
+    const reservation = await createReservation({ productId: 'prod-1', warehouseId: 'wh-1', quantity: 2 });
+    const released = await releaseReservation(reservation.id);
+
+    expect(released.status).toBe('RELEASED');
+
+    const { prisma } = require('@/lib/prisma');
+    const stock = prisma.__getStockSnapshot()['prod-1|wh-1'];
+    expect(stock.reserved).toBe(0);
+    expect(stock.totalUnits).toBe(5);
+  });
+
+  test('cleanup releases expired reservations and returns count', async () => {
+    const { cleanupExpiredReservations } = require('@/lib/inventory');
+    const reservation = await createReservation({ productId: 'prod-1', warehouseId: 'wh-1', quantity: 1 });
+
+    const { prisma } = require('@/lib/prisma');
+    prisma.__setReservationExpiresAt(reservation.id, new Date(Date.now() - 60_000));
+
+    const cleaned = await cleanupExpiredReservations();
+    expect(cleaned).toBe(1);
+
+    const reservationSnapshot = prisma.__getReservationSnapshot(reservation.id);
+    expect(reservationSnapshot.status).toBe('RELEASED');
+
+    const stock = prisma.__getStockSnapshot()['prod-1|wh-1'];
+    expect(stock.reserved).toBe(0);
+    expect(stock.totalUnits).toBe(5);
   });
 });

@@ -1,112 +1,62 @@
 # Allo Inventory Reservation System
 
-Reservation-first inventory management for multi-warehouse commerce.
+A reservation-first inventory system for multi-warehouse commerce. This project holds stock temporarily during slow payment flows so the same unit is not sold twice, while also avoiding false stock depletion from abandoned carts.
 
-## Project Overview
+## What this app does
 
-This is an inventory reservation system for multi-warehouse retail and D2C brands. The point is to avoid overselling during slow payment flows while also avoiding fake stock depletion during cart abandonment.
+The core flow is:
 
-The flow is:
+1. A customer starts checkout.
+2. The app creates a temporary reservation for the requested units.
+3. If payment succeeds, the reservation is confirmed.
+4. If payment fails, the user cancels, or the hold expires, the stock is released back to availability.
 
-- A customer reaches checkout.
-- Stock is reserved for a short window instead of being decremented immediately.
-- If payment succeeds, the reservation is confirmed.
-- If payment fails or the hold expires, stock is released back to availability.
+The assignment focuses on correctness under concurrency, predictable expiry, and a clean user experience.
 
-The exercise is intentionally about correctness under concurrency, so the reservation logic is the main focus of the app.
-
-## Provider Choice
-
-This workspace is set up for:
-
-- Supabase for hosted Postgres
-- Upstash for Redis
-
-I still need the real connection strings/tokens from you before the app can talk to live services.
-
-## Design Notes
-
-The UI is built dark-first with glassy cards, color-coded status states, and a monospace countdown timer on the reservation page.
-
-- Primary background: slate navy
-- Accent: indigo
-- Success: green
-- Warning: amber
-- Danger: red
-
-The frontend is intentionally simple and direct so the reservation flow is easy to follow.
-
-## What It Does
-
-This app models the core checkout reservation flow from the take-home exercise:
-
-- Products are stocked per warehouse.
-- Checkout creates a temporary reservation hold for 10 minutes.
-- Payment success confirms the reservation and permanently decrements stock.
-- Payment failure or cancellation releases the hold early.
-- Expired reservations are cleaned up automatically by a Vercel Cron job.
-
-## Stack
+## Tech Stack
 
 - Next.js 16 App Router
 - TypeScript
-- Prisma + PostgreSQL
-- Upstash Redis for idempotency
-- Zod for request validation
-- Tailwind CSS for UI styling
+- Prisma ORM
+- PostgreSQL
+- Upstash Redis
+- Zod
+- Tailwind CSS
 
-## Data Model
+## Key domain rule
 
-The app uses four main concepts:
+The app never stores available stock as a separate persisted field.
 
-- `Product`
-- `Warehouse`
-- `Stock`
-- `Reservation`
+```text
+availableUnits = totalUnits - reserved
+```
 
-The important rule is:
+That keeps the system consistent and avoids drift between derived and stored values.
 
-- `availableUnits = totalUnits - reserved`
-
-That value is computed in queries instead of being stored separately, which keeps inventory state consistent.
-
-## API Surface
-
-The app exposes these endpoints:
+## Important API routes
 
 - `GET /api/products`
 - `GET /api/warehouses`
 - `POST /api/reservations`
+- `GET /api/reservations/:id`
 - `POST /api/reservations/:id/confirm`
 - `POST /api/reservations/:id/release`
-- `GET /api/reservations/:id`
 - `GET /api/cron/cleanup`
 
-The reservation creation path uses a PostgreSQL row lock with `FOR UPDATE` so two requests racing for the final unit cannot both succeed.
+Reservation creation uses a PostgreSQL transaction with row locking so two users racing for the last unit cannot both succeed.
 
-## Frontend Pages
+## How to run the app locally
 
-The app has two user-facing pages:
-
-- Product listing page at `/`
-- Reservation page at `/reservation/:id`
-
-The listing page shows products, stock per warehouse, and a reserve action. The reservation page shows the hold details, live countdown, confirm button, and cancel button.
-
-The page state updates locally after confirm or release, so the user does not need to refresh.
-
-## Local Setup
-
-### 1. Install dependencies
+### 1) Install dependencies
 
 ```bash
 cd allo-inventory
 npm install
 ```
 
-### 2. Configure environment variables
+### 2) Create environment variables
 
-Copy `.env.example` to `.env.local` and fill in:
+Copy `.env.example` to `.env.local` and fill it with real values.
 
 ```env
 DATABASE_URL="postgresql://user:password@host:5432/dbname?pgbouncer=true"
@@ -116,124 +66,119 @@ UPSTASH_REDIS_REST_TOKEN="your-token"
 CRON_SECRET="your-random-secret-string"
 ```
 
-You need to paste the real values from:
+Where each value comes from:
 
-- Supabase Database Settings for `DATABASE_URL` and `DIRECT_URL`
-- Upstash Redis Console for `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
-- Any secure random string for `CRON_SECRET`
+- `DATABASE_URL` and `DIRECT_URL`: Supabase, Neon, or another hosted PostgreSQL provider
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis console
+- `CRON_SECRET`: any strong random secret you generate yourself
 
-### 3. Generate Prisma client
-
-```bash
-npx prisma generate
-```
-
-### 4. Run migrations
+### 3) Generate Prisma client
 
 ```bash
-npx prisma migrate dev --name init
+npm run prisma:generate
 ```
 
-### 5. Seed sample data
+### 4) Run database migrations
+
+```bash
+npm run prisma:migrate
+```
+
+If this is the first setup, Prisma will create the tables described in `prisma/schema.prisma`.
+
+### 5) Seed demo data
 
 ```bash
 npm run seed
 ```
 
-### 6. Start the app
+This loads sample warehouses, products, and stock so the app has data immediately after startup.
+
+### 6) Start the app
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open `http://localhost:3000` in your browser.
 
-## Deployment Notes
-
-- The app is meant to be deployed on Vercel.
-- PostgreSQL should be hosted on Supabase or an equivalent managed provider.
-- Redis should be hosted on Upstash.
-- Expired reservations are cleaned by Vercel Cron every 2 minutes.
-
-## Validation
+### Optional validation
 
 ```bash
 npm run lint
 npm run build
 ```
 
-## API
+## How the expiry mechanism works in production
 
-- `GET /api/products` returns products with per-warehouse available stock.
-- `GET /api/warehouses` returns warehouse metadata.
-- `POST /api/reservations` creates a reservation hold.
-- `POST /api/reservations/:id/confirm` confirms a reservation.
-- `POST /api/reservations/:id/release` releases a reservation early.
-- `GET /api/reservations/:id` returns the reservation state for the checkout page.
-- `GET /api/cron/cleanup` releases expired reservations.
+Expiry is handled by a Vercel Cron job.
 
-The reservation endpoint is concurrency-safe by locking the stock row inside a PostgreSQL transaction with `FOR UPDATE`. If two requests race for the last unit, exactly one succeeds and the other gets `409`.
-
-## Expiry Mechanism
-
-Production expiry is handled by a Vercel Cron job configured in `vercel.json`.
-
-- The cron hits `/api/cron/cleanup` every 2 minutes.
-- The endpoint finds pending reservations where `expiresAt < now()`.
+- `vercel.json` schedules `GET /api/cron/cleanup` every 2 minutes.
+- The cleanup endpoint finds reservations in `PENDING` state whose `expiresAt` is older than the current time.
 - Each expired reservation is released inside a transaction.
-- The stock row is updated so the released units become available again.
+- The associated stock row is updated so the reserved units become available again.
 
-The app pages are marked `force-dynamic`, so local builds do not try to prerender them against a missing database.
+Why this approach:
 
-## Bonus: Idempotency
+- It is simple to deploy on Vercel.
+- It keeps the expiration logic centralized in the backend.
+- It avoids depending on a separate always-on worker process.
 
-The reserve and confirm endpoints accept `Idempotency-Key`.
+I kept the frontend countdown client-side only. The UI shows the reservation timer for the current user, while the server remains the source of truth for actual expiry.
 
-- If the key already exists in Redis, the original response is returned.
-- Otherwise the request is processed and cached for 24 hours.
+## Data model
 
-This makes retries safe when the client repeats a request after a timeout or connection issue.
+The main entities are:
 
-## Idempotency
+- `Product`
+- `Warehouse`
+- `Stock`
+- `Reservation`
 
-The `reserve` and `confirm` endpoints accept `Idempotency-Key`.
+The important relationships are:
 
-- The key is checked in Upstash Redis.
-- If a matching response already exists, the original response is returned.
-- If not, the request is processed and the response is cached for 24 hours.
+- a product can exist in multiple warehouses
+- each warehouse can hold stock for many products
+- each reservation is tied to exactly one product and one warehouse
 
-## Trade-Offs
+## Trade-offs and decisions
 
-- I used PostgreSQL row locking rather than Redis distributed locks for the reservation race, because the stock row itself is the source of truth.
-- The UI countdown is client-side only; it updates the current reservation view without WebSockets or SSE.
-- Expiry is cron-driven instead of a background worker because it fits Vercel deployment better.
-- I left admin tooling, WebSocket stock sync, and broader rate limiting out to keep the scope focused.
+- I used PostgreSQL row locking instead of Redis distributed locks for reservation creation, because the stock row is the real source of truth.
+- I kept the expiry process cron-driven instead of building a separate worker, because it fits Vercel much better.
+- I kept the UI simple and predictable rather than adding WebSockets or SSE, because the assignment is mainly about correctness and clarity.
+- I used Redis for idempotency support rather than for locking, so each concern stays separated.
 
-## What Was Left Out
+## What I would do with more time
 
-With more time, I would add:
-
-- WebSocket or SSE stock updates
-- Admin dashboard for inventory and reservation monitoring
-- Rate limiting on reservation endpoints
-- Email or notification reminders before expiry
-- More complete E2E and concurrency tests
-
-## Seed Data
-
-The seed script creates:
-
-- 3 warehouses
-- 5 products
-- stock rows for every product/warehouse pair
-
-The product catalog is intentionally non-empty so the demo flow works immediately after seeding.
+- Add full E2E coverage for the reservation flow
+- Add a proper admin dashboard for inventory monitoring
+- Add WebSocket or SSE updates for live stock changes
+- Add rate limiting and stronger abuse protection on reservation endpoints
+- Add better observability around expiry and reservation failures
+- Add more structured concurrency tests against a real PostgreSQL instance
 
 ## Testing
 
-The repo currently validates with:
+The repository now includes Jest-based tests for the reservation logic.
 
-- `npm run lint`
-- `npm run build`
+```bash
+npm test
+```
 
-For a fuller suite, I would add unit tests for the reservation service and a concurrency test that proves exactly one of two competing reservations for the last unit succeeds.
+The current suite validates that:
+
+- reservations are created when stock is available
+- over-reservation returns a conflict
+- only one request can claim the last unit in the tested flow
+
+## Project structure
+
+- `src/app` contains the Next.js app and API routes
+- `src/lib` contains Prisma, inventory, API, and idempotency helpers
+- `src/schemas` contains Zod validation schemas
+- `prisma` contains the database schema, migrations, and seed script
+- `src/__tests__` contains the test coverage added for this assignment
+
+## Submission note
+
+The file `README (10).md` at the workspace root is the assignment brief. This `README.md` inside `allo-inventory` is the single polished submission document for the app itself.
