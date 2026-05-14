@@ -23,6 +23,21 @@ export function ReservationView({ initialReservation }: { initialReservation: Re
   const [remainingSeconds, setRemainingSeconds] = useState(() => secondsUntil(initialReservation.expiresAt));
   const [message, setMessage] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState<"confirm" | "release" | null>(null);
+  const [purchaseSuccessful, setPurchaseSuccessful] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
+
+  useEffect(() => {
+    if (!purchaseSuccessful) {
+      return;
+    }
+
+    setSuccessVisible(false);
+    const frame = window.requestAnimationFrame(() => {
+      setSuccessVisible(true);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [purchaseSuccessful]);
 
   useEffect(() => {
     if (reservation.status !== "PENDING") {
@@ -74,7 +89,9 @@ export function ReservationView({ initialReservation }: { initialReservation: Re
       if (payload.status) {
         setReservation((current) => ({
           ...current,
+          ...payload,
           status: payload.status ?? current.status,
+          productPrice: payload.productPrice ?? current.productPrice,
           confirmedAt: payload.confirmedAt ?? current.confirmedAt,
           releasedAt: payload.releasedAt ?? current.releasedAt,
           updatedAt: payload.updatedAt ?? current.updatedAt,
@@ -89,7 +106,8 @@ export function ReservationView({ initialReservation }: { initialReservation: Re
       }
 
       if (label === "confirm") {
-        setMessage("Reservation confirmed. Inventory has been decremented.");
+        setMessage(null);
+        setPurchaseSuccessful(true);
       }
     } catch (requestError) {
       setMessage(requestError instanceof Error ? requestError.message : "Unable to update reservation.");
@@ -101,6 +119,69 @@ export function ReservationView({ initialReservation }: { initialReservation: Re
   const isPending = reservation.status === "PENDING";
   const timerTone = remainingSeconds <= 60 ? "text-rose-300" : remainingSeconds <= 180 ? "text-amber-300" : "text-slate-50";
   const expiryMessage = isPending && remainingSeconds === 0 ? "Reservation expired. The stock has been released." : null;
+  const amountPaid = Number(reservation.productPrice) * reservation.quantity;
+
+  if (purchaseSuccessful) {
+    return (
+      <section className="relative isolate flex min-h-[calc(100vh-6rem)] w-full items-center justify-center overflow-hidden px-3 py-6 sm:px-4 md:px-8 lg:py-10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.24),transparent_45%),radial-gradient(circle_at_bottom,rgba(74,222,128,0.14),transparent_38%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent" />
+
+        <div
+          className={`relative w-full max-w-2xl rounded-3xl border border-emerald-400/20 bg-slate-950/90 p-6 sm:p-8 md:p-10 shadow-2xl shadow-emerald-950/40 backdrop-blur-xl transition-all duration-700 ease-out ${successVisible ? "translate-y-0 scale-100 opacity-100" : "translate-y-5 scale-95 opacity-0"}`}
+        >
+          <div className="flex flex-col items-center text-center">
+            <div
+              className={`flex h-20 w-20 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 text-4xl font-black text-emerald-300 shadow-[0_0_70px_rgba(16,185,129,0.35)] transition-all duration-700 ease-out ${successVisible ? "scale-100 opacity-100" : "scale-75 opacity-0"}`}
+            >
+              ✓
+            </div>
+
+            <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-50 sm:text-4xl">
+              Purchase Successful!
+            </h1>
+            <p className="mt-3 text-sm text-slate-300 sm:text-base">
+              Your order has been confirmed.
+            </p>
+
+            <div className="mt-8 w-full rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5 text-left shadow-xl shadow-black/20">
+              <p className="text-xs uppercase tracking-[0.24em] text-emerald-200/80">Order summary</p>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Product</p>
+                  <p className="mt-2 text-sm font-medium text-slate-50">{reservation.productName}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Quantity</p>
+                  <p className="mt-2 text-sm font-medium text-slate-50">
+                    {reservation.quantity} unit{reservation.quantity > 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Warehouse</p>
+                  <p className="mt-2 text-sm font-medium text-slate-50">{reservation.warehouseName}</p>
+                  <p className="mt-1 text-xs text-slate-400">{reservation.warehouseLocation}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 sm:p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Amount paid</p>
+                  <p className="mt-2 text-sm font-semibold text-emerald-300">{formatPrice(String(amountPaid))}</p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="mt-8 inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400"
+            >
+              Back to Products
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -135,7 +216,7 @@ export function ReservationView({ initialReservation }: { initialReservation: Re
           </div>
           <div className="rounded-lg sm:rounded-3xl border border-white/10 bg-slate-950/40 p-3 sm:p-4">
             <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Value</p>
-            <p className="mt-2 font-medium text-slate-100 text-sm sm:text-base">{formatPrice("2999")}</p>
+            <p className="mt-2 font-medium text-slate-100 text-sm sm:text-base">{formatPrice(String(amountPaid))}</p>
           </div>
         </div>
 

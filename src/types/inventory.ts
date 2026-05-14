@@ -30,6 +30,7 @@ export type ReservationSummary = {
   productId: string;
   productName: string;
   productSku: string;
+  productPrice: string;
   warehouseId: string;
   warehouseName: string;
   warehouseLocation: string;

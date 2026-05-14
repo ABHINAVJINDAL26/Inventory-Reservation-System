@@ -43,7 +43,7 @@ type ReservationRow = {
   updatedAt: Date;
   confirmedAt: Date | null;
   releasedAt: Date | null;
-  product: Pick<ProductRow, "id" | "name" | "sku">;
+  product: Pick<ProductRow, "id" | "name" | "sku" | "price">;
   warehouse: WarehouseRow;
 };
 
@@ -100,6 +100,7 @@ function mapReservation(reservation: ReservationRow): ReservationSummary {
     productId: reservation.productId,
     productName: reservation.product.name,
     productSku: reservation.product.sku,
+    productPrice: reservation.product.price.toString(),
     warehouseId: reservation.warehouseId,
     warehouseName: reservation.warehouse.name,
     warehouseLocation: reservation.warehouse.location,
