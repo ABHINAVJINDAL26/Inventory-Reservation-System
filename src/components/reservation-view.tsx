@@ -98,14 +98,25 @@ export function ReservationView({ initialReservation }: { initialReservation: Re
         }));
       }
 
-      if (label === "release") {
-        setMessage(null);
-        setTerminalState("released");
-      }
+      // Only show the terminal success/cancel UI if the server returned the
+      // matching status change. This prevents showing a success screen when
+      // the backend did not actually confirm/release the reservation.
+      if (payload.status) {
+        if (label === "release" && payload.status === "RELEASED") {
+          setMessage(null);
+          setTerminalState("released");
+        }
 
-      if (label === "confirm") {
-        setMessage(null);
-        setTerminalState("confirmed");
+        if (label === "confirm" && payload.status === "CONFIRMED") {
+          setMessage(null);
+          setTerminalState("confirmed");
+        }
+      } else {
+        // Defensive: if response was OK but no status returned, show an error
+        // so user knows the operation may not have completed.
+        if (response.ok && !payload.status) {
+          setMessage("Unexpected server response. Please retry or refresh the page.");
+        }
       }
     } catch (requestError) {
       setMessage(requestError instanceof Error ? requestError.message : "Unable to update reservation.");
@@ -185,7 +196,15 @@ export function ReservationView({ initialReservation }: { initialReservation: Re
 
             <button
               type="button"
-              onClick={() => router.push("/")}
+              onClick={async () => {
+                await router.push("/");
+                try {
+                  // ensure the catalog page fetches fresh data
+                  router.refresh();
+                } catch (err) {
+                  // ignore refresh errors
+                }
+              }}
               className={`mt-8 inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white shadow-lg transition ${isConfirmed ? "bg-emerald-500 shadow-emerald-950/30 hover:bg-emerald-400" : "bg-rose-500 shadow-rose-950/30 hover:bg-rose-400"}`}
             >
               {actionLabel}
