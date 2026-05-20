@@ -95,12 +95,14 @@ function mapProduct(product: ProductRow): ProductSummary {
 }
 
 function mapReservation(reservation: ReservationRow): ReservationSummary {
+  const productPrice = reservation.product?.price ? (typeof reservation.product.price === 'object' && typeof (reservation.product.price as any).toString === 'function' ? (reservation.product.price as any).toString() : String(reservation.product.price)) : '0';
+
   return {
     id: reservation.id,
     productId: reservation.productId,
-    productName: reservation.product.name,
-    productSku: reservation.product.sku,
-    productPrice: reservation.product.price.toString(),
+    productName: reservation.product?.name ?? null,
+    productSku: reservation.product?.sku ?? null,
+    productPrice,
     warehouseId: reservation.warehouseId,
     warehouseName: reservation.warehouse.name,
     warehouseLocation: reservation.warehouse.location,
